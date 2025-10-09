@@ -153,6 +153,21 @@
             margin-top: 5px;
         }
 
+        .note-tags {
+            margin: 5px 0;
+        }
+
+        .tag {
+            display: inline-block;
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-right: 5px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+        }
+
         .editor-header {
             display: flex;
             justify-content: space-between;
@@ -197,6 +212,18 @@
 
         .btn-delete:hover {
             background: #c82333;
+            transform: translateY(-1px);
+        }
+
+        .btn-generate {
+            background: #17a2b8;
+            color: white;
+            width: auto;
+            margin-left: 10px;
+        }
+
+        .btn-generate:hover {
+            background: #138496;
             transform: translateY(-1px);
         }
 
@@ -361,6 +388,12 @@
                         <label class="form-label" for="noteContent">Content</label>
                         <textarea class="form-textarea" id="noteContent" placeholder="Start writing your note..."></textarea>
                     </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="noteTags">Tags</label>
+                        <input type="text" class="form-input" id="noteTags" placeholder="Enter tags (comma-separated)">
+                        <button class="btn btn-generate" id="generateBtn" style="margin-top: 10px;">🎯 Generate Title & Tags</button>
+                    </div>
                 </div>
 
                 <div class="empty-state" id="emptyState">
@@ -390,6 +423,7 @@
                 document.getElementById('saveBtn').addEventListener('click', () => this.saveNote());
                 document.getElementById('deleteBtn').addEventListener('click', () => this.deleteNote());
                 document.getElementById('searchBox').addEventListener('input', (e) => this.searchNotes(e.target.value));
+                document.getElementById('generateBtn').addEventListener('click', () => this.generateNote());
                 
                 // Auto-save on content change (debounced)
                 let saveTimeout;
@@ -404,6 +438,7 @@
                 
                 document.getElementById('noteTitle').addEventListener('input', autoSave);
                 document.getElementById('noteContent').addEventListener('input', autoSave);
+                document.getElementById('noteTags').addEventListener('input', autoSave);
             }
 
             async loadNotes() {
@@ -437,6 +472,7 @@
                          data-note-id="${note.id}" onclick="noteTaker.selectNote(${note.id})">
                         <div class="note-title">${this.escapeHtml(note.title || 'Untitled')}</div>
                         <div class="note-preview">${this.escapeHtml(note.content || 'No content')}</div>
+                        <div class="note-tags">${note.tags ? note.tags.map(tag => `<span class="tag">${this.escapeHtml(tag)}</span>`).join('') : ''}</div>
                         <div class="note-date">${this.formatDate(note.updated_at)}</div>
                     </div>
                 `).join('');
@@ -490,11 +526,45 @@
                 this.currentNote = null;
             }
 
+            async generateNote() {
+                const content = document.getElementById('noteContent').value.trim();
+                
+                if (!content) {
+                    this.showMessage('Please enter some content to generate title and tags', 'error');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/notes/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content })
+                    });
+
+                    if (!response.ok) throw new Error('Failed to generate note');
+
+                    const generatedNote = await response.json();
+                    
+                    // Update the form with generated data
+                    document.getElementById('noteTitle').value = generatedNote.title;
+                    document.getElementById('noteTags').value = generatedNote.tags.join(', ');
+                    
+                    this.currentNote = generatedNote;
+                    this.notes.unshift(generatedNote);
+                    this.renderNotesList();
+                    
+                    this.showMessage('Successfully generated note!', 'success');
+                } catch (error) {
+                    this.showMessage(`Error generating note: ${error.message}`, 'error');
+                }
+            }
+
             async saveNote(isAutoSave = false) {
                 if (!this.currentNote) return;
 
                 const title = document.getElementById('noteTitle').value.trim();
                 const content = document.getElementById('noteContent').value.trim();
+                const tags = document.getElementById('noteTags').value.trim();
 
                 if (!title && !content) {
                     if (!isAutoSave) {
@@ -506,7 +576,8 @@
                 try {
                     const noteData = {
                         title: title || 'Untitled',
-                        content: content
+                        content: content,
+                        tags: tags
                     };
 
                     let response;

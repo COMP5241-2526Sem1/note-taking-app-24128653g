@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 from src.models.note import Note, db
+from src.llm import generate_note_metadata
 
 note_bp = Blueprint('note', __name__)
 
@@ -73,4 +74,30 @@ def search_notes():
     ).order_by(Note.updated_at.desc()).all()
     
     return jsonify([note.to_dict() for note in notes])
+
+@note_bp.route('/notes/generate', methods=['POST'])
+def generate_note():
+    """Generate a note with title and tags using LLM"""
+    try:
+        data = request.json
+        if not data or 'content' not in data:
+            return jsonify({'error': 'Content is required'}), 400
+        
+        # Generate title and tags using LLM
+        metadata = generate_note_metadata(data['content'])
+        
+        # Create the note with generated metadata
+        note = Note(
+            title=metadata['title'],
+            content=data['content'],
+            tags=','.join(metadata['tags'])
+        )
+        
+        db.session.add(note)
+        db.session.commit()
+        return jsonify(note.to_dict()), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
