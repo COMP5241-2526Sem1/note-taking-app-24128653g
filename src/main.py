@@ -5,10 +5,27 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, send_from_directory
 from flask_cors import CORS
-from src.models.user import db
+from dotenv import load_dotenv
+from pymongo import MongoClient
 from src.routes.user import user_bp
 from src.routes.note import note_bp
-from src.models.note import Note
+from src.models import user as user_model
+from src.models import note as note_model
+
+load_dotenv()
+
+MONGODB_URI = os.environ.get('MONGODB_URI')
+MONGODB_DB = os.environ.get('MONGODB_DB', 'note_app_db')
+
+if not MONGODB_URI:
+    raise RuntimeError('MONGODB_URI not set in environment (.env)')
+
+client = MongoClient(MONGODB_URI)
+db = client[MONGODB_DB]
+
+# initialize model modules with db
+user_model.init_db(db)
+note_model.init_db(db)
 
 app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
@@ -19,17 +36,7 @@ CORS(app)
 # register blueprints
 app.register_blueprint(user_bp, url_prefix='/api')
 app.register_blueprint(note_bp, url_prefix='/api')
-# configure database to use repository-root `database/app.db`
-ROOT_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
-DB_PATH = os.path.join(ROOT_DIR, 'database', 'app.db')
-# ensure database directory exists
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{DB_PATH}"
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db.init_app(app)
-with app.app_context():
-    db.create_all()
+# No SQL database initialization required; MongoDB client already created above
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')

@@ -1,14 +1,18 @@
 from flask import Blueprint, jsonify, request
-from src.models.note import Note, db
+from bson.objectid import ObjectId
+from datetime import datetime
+from src.models import note as note_model
 from src.llm import generate_note_metadata
 
 note_bp = Blueprint('note', __name__)
 
+
 @note_bp.route('/notes', methods=['GET'])
 def get_notes():
     """Get all notes, ordered by most recently updated"""
-    notes = Note.query.order_by(Note.updated_at.desc()).all()
-    return jsonify([note.to_dict() for note in notes])
+    col = note_model.get_notes_collection()
+    docs = col.find().sort('updated_at', -1)
+    return jsonify([note_model.to_public(d) for d in docs])
 
 @note_bp.route('/notes', methods=['POST'])
 def create_note():
@@ -17,50 +21,62 @@ def create_note():
         data = request.json
         if not data or 'title' not in data or 'content' not in data:
             return jsonify({'error': 'Title and content are required'}), 400
-        
-        note = Note(title=data['title'], content=data['content'])
-        db.session.add(note)
-        db.session.commit()
-        return jsonify(note.to_dict()), 201
+        col = note_model.get_notes_collection()
+        doc = note_model.make_note_doc(data)
+        res = col.insert_one(doc)
+        created = col.find_one({'_id': res.inserted_id})
+        return jsonify(note_model.to_public(created)), 201
     except Exception as e:
-        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@note_bp.route('/notes/<int:note_id>', methods=['GET'])
+@note_bp.route('/notes/<note_id>', methods=['GET'])
 def get_note(note_id):
     """Get a specific note by ID"""
-    note = Note.query.get_or_404(note_id)
-    return jsonify(note.to_dict())
+    try:
+        col = note_model.get_notes_collection()
+        doc = col.find_one({'_id': ObjectId(note_id)})
+        if not doc:
+            return jsonify({'error': 'Not found'}), 404
+        return jsonify(note_model.to_public(doc))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
-@note_bp.route('/notes/<int:note_id>', methods=['PUT'])
+@note_bp.route('/notes/<note_id>', methods=['PUT'])
 def update_note(note_id):
     """Update a specific note"""
     try:
-        note = Note.query.get_or_404(note_id)
         data = request.json
-        
         if not data:
             return jsonify({'error': 'No data provided'}), 400
-        
-        note.title = data.get('title', note.title)
-        note.content = data.get('content', note.content)
-        db.session.commit()
-        return jsonify(note.to_dict())
+        col = note_model.get_notes_collection()
+        update = {}
+        if 'title' in data:
+            update['title'] = data['title']
+        if 'content' in data:
+            update['content'] = data['content']
+        if 'tags' in data:
+            update['tags'] = data['tags']
+        if update:
+            update['updated_at'] = datetime.utcnow()
+            col.update_one({'_id': ObjectId(note_id)}, {'$set': update})
+        doc = col.find_one({'_id': ObjectId(note_id)})
+        if not doc:
+            return jsonify({'error': 'Not found'}), 404
+        return jsonify(note_model.to_public(doc))
     except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)}), 400
 
-@note_bp.route('/notes/<int:note_id>', methods=['DELETE'])
+@note_bp.route('/notes/<note_id>', methods=['DELETE'])
 def delete_note(note_id):
     """Delete a specific note"""
     try:
-        note = Note.query.get_or_404(note_id)
-        db.session.delete(note)
-        db.session.commit()
+        col = note_model.get_notes_collection()
+        res = col.delete_one({'_id': ObjectId(note_id)})
+        if res.deleted_count == 0:
+            return jsonify({'error': 'Not found'}), 404
         return '', 204
     except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)}), 400
 
 @note_bp.route('/notes/search', methods=['GET'])
 def search_notes():
@@ -69,11 +85,12 @@ def search_notes():
     if not query:
         return jsonify([])
     
-    notes = Note.query.filter(
-        (Note.title.contains(query)) | (Note.content.contains(query))
-    ).order_by(Note.updated_at.desc()).all()
-    
-    return jsonify([note.to_dict() for note in notes])
+    col = note_model.get_notes_collection()
+    docs = col.find({'$or': [
+        {'title': {'$regex': query, '$options': 'i'}},
+        {'content': {'$regex': query, '$options': 'i'}}
+    ]}).sort('updated_at', -1)
+    return jsonify([note_model.to_public(d) for d in docs])
 
 @note_bp.route('/notes/generate', methods=['POST'])
 def generate_note():
@@ -86,18 +103,16 @@ def generate_note():
         # Generate title and tags using LLM
         metadata = generate_note_metadata(data['content'])
         
-        # Create the note with generated metadata
-        note = Note(
-            title=metadata['title'],
-            content=data['content'],
-            tags=','.join(metadata['tags'])
-        )
-        
-        db.session.add(note)
-        db.session.commit()
-        return jsonify(note.to_dict()), 201
+        col = note_model.get_notes_collection()
+        doc = note_model.make_note_doc({
+            'title': metadata['title'],
+            'content': data['content'],
+            'tags': metadata['tags']
+        })
+        res = col.insert_one(doc)
+        created = col.find_one({'_id': res.inserted_id})
+        return jsonify(note_model.to_public(created)), 201
         
     except Exception as e:
-        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 

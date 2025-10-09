@@ -1,25 +1,38 @@
-from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-from src.models.user import db
+from bson.objectid import ObjectId
 
-class Note(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    tags = db.Column(db.Text, nullable=True)  # Store tags as comma-separated string
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    def __repr__(self):
-        return f'<Note {self.title}>'
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'title': self.title,
-            'content': self.content,
-            'tags': self.tags.split(',') if self.tags else [],
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
+# Mongo-backed helpers for notes collection
+_db = None
+
+def init_db(db):
+    global _db
+    _db = db
+
+def get_notes_collection():
+    if _db is None:
+        raise RuntimeError('Database not initialized. Call init_db(db) from main.')
+    return _db.get_collection('notes')
+
+def to_public(note_doc):
+    if not note_doc:
+        return None
+    return {
+        'id': str(note_doc.get('_id')),
+        'title': note_doc.get('title'),
+        'content': note_doc.get('content'),
+        'tags': note_doc.get('tags', []),
+        'created_at': note_doc.get('created_at').isoformat() if note_doc.get('created_at') else None,
+        'updated_at': note_doc.get('updated_at').isoformat() if note_doc.get('updated_at') else None
+    }
+
+def make_note_doc(data):
+    now = datetime.utcnow()
+    return {
+        'title': data.get('title'),
+        'content': data.get('content'),
+        'tags': data.get('tags') or [],
+        'created_at': now,
+        'updated_at': now
+    }
+
 
