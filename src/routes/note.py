@@ -99,9 +99,12 @@ def generate_note():
         data = request.json
         if not data or 'content' not in data:
             return jsonify({'error': 'Content is required'}), 400
-        
         # Generate title and tags using LLM
-        metadata = generate_note_metadata(data['content'])
+        try:
+            metadata = generate_note_metadata(data['content'])
+        except Exception as e:
+            # Propagate a clear error message to the client
+            return jsonify({'error': 'Failed to generate note', 'details': str(e)}), 500
         
         col = note_model.get_notes_collection()
         doc = note_model.make_note_doc({
