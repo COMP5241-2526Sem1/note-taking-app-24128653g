@@ -472,7 +472,7 @@
                          data-note-id="${note.id}" onclick="noteTaker.selectNote(${note.id})">
                         <div class="note-title">${this.escapeHtml(note.title || 'Untitled')}</div>
                         <div class="note-preview">${this.escapeHtml(note.content || 'No content')}</div>
-                        <div class="note-tags">${note.tags ? note.tags.map(tag => `<span class="tag">${this.escapeHtml(tag)}</span>`).join('') : ''}</div>
+                        <div class="note-tags">${Array.isArray(note.tags) ? note.tags.map(tag => `<span class="tag">${this.escapeHtml(tag)}</span>`).join('') : (note.tags ? `<span class="tag">${this.escapeHtml(note.tags)}</span>` : '')}</div>
                         <div class="note-date">${this.formatDate(note.updated_at)}</div>
                     </div>
                 `).join('');
@@ -488,6 +488,8 @@
                 
                 document.getElementById('noteTitle').value = note.title || '';
                 document.getElementById('noteContent').value = note.content || '';
+                // Populate tags input; ensure we show comma-separated list even if tags is an array
+                document.getElementById('noteTags').value = Array.isArray(note.tags) ? note.tags.join(', ') : (note.tags || '');
                 document.getElementById('editorTitle').textContent = note.title || 'Untitled Note';
             }
 
@@ -496,6 +498,7 @@
                     id: null,
                     title: '',
                     content: '',
+                    tags: [],
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 };
@@ -564,7 +567,9 @@
 
                 const title = document.getElementById('noteTitle').value.trim();
                 const content = document.getElementById('noteContent').value.trim();
-                const tags = document.getElementById('noteTags').value.trim();
+                // Parse tags input into an array before sending to backend
+                const tagsRaw = document.getElementById('noteTags').value.trim();
+                const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
 
                 if (!title && !content) {
                     if (!isAutoSave) {
