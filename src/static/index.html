@@ -469,7 +469,7 @@
 
                 notesList.innerHTML = this.notes.map(note => `
                     <div class="note-item ${this.currentNote && this.currentNote.id === note.id ? 'active' : ''}" 
-                         data-note-id="${note.id}" onclick="noteTaker.selectNote(${note.id})">
+                         data-note-id="${note.id}" onclick="noteTaker.selectNote('${note.id}')">
                         <div class="note-title">${this.escapeHtml(note.title || 'Untitled')}</div>
                         <div class="note-preview">${this.escapeHtml(note.content || 'No content')}</div>
                         <div class="note-tags">${Array.isArray(note.tags) ? note.tags.map(tag => `<span class="tag">${this.escapeHtml(tag)}</span>`).join('') : (note.tags ? `<span class="tag">${this.escapeHtml(note.tags)}</span>` : '')}</div>
@@ -663,7 +663,7 @@
 
                 notesList.innerHTML = filteredNotes.map(note => `
                     <div class="note-item ${this.currentNote && this.currentNote.id === note.id ? 'active' : ''}" 
-                         data-note-id="${note.id}" onclick="noteTaker.selectNote(${note.id})">
+                         data-note-id="${note.id}" onclick="noteTaker.selectNote('${note.id}')">
                         <div class="note-title">${this.escapeHtml(note.title || 'Untitled')}</div>
                         <div class="note-preview">${this.escapeHtml(note.content || 'No content')}</div>
                         <div class="note-date">${this.formatDate(note.updated_at)}</div>
