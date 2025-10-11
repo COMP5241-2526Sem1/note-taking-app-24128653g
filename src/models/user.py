@@ -1,18 +1,28 @@
-from flask_sqlalchemy import SQLAlchemy
+from bson.objectid import ObjectId
 
-db = SQLAlchemy()
+# The file exposes helper functions around the `users` collection.
+_db = None
 
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+def init_db(db):
+    global _db
+    _db = db
 
-    def __repr__(self):
-        return f'<User {self.username}>'
+def get_user_collection():
+    if _db is None:
+        raise RuntimeError('Database not initialized. Call init_db(db) from main.')
+    return _db.get_collection('users')
 
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'username': self.username,
-            'email': self.email
-        }
+def to_public(user_doc):
+    if not user_doc:
+        return None
+    return {
+        'id': str(user_doc.get('_id')),
+        'username': user_doc.get('username'),
+        'email': user_doc.get('email')
+    }
+
+def from_dict(data):
+    return {
+        'username': data.get('username'),
+        'email': data.get('email')
+    }

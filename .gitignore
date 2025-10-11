@@ -110,3 +110,12 @@ Thumbs.db
 .coverage
 coverage.xml
 *.prof
+
+# .env file
+.env
+
+# IDE specific files
+python*
+lib*
+
+*.cfg

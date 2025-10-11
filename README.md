@@ -67,20 +67,10 @@ notetaking-app/
    ```bash
    python -m venv venv
    ```
-
-2. **Activate the virtual environment**
    ```bash
    source venv/bin/activate
-   ```
-
-   Remark: On Windows, use `venv\Scripts\activate`
 
 3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Run the application**
    ```bash
    python src/main.py
    ```
@@ -106,19 +96,42 @@ notetaking-app/
   "content": "Note content here...",
   "created_at": "2025-09-03T11:26:38.123456",
   "updated_at": "2025-09-03T11:27:30.654321"
-}
-```
-
-## 🎨 User Interface Features
-
-### Sidebar
-- **Search Box**: Real-time search through note titles and content
-- **New Note Button**: Create new notes instantly
 - **Notes List**: Scrollable list of all notes with previews
-- **Note Previews**: Show title, content preview, and last modified date
 
 ### Editor Panel
 - **Title Input**: Edit note titles
+   ## Deploy to Vercel
+
+   This project can be deployed to Vercel using the Python Serverless runtime. The repository includes a `vercel.json` and an `api/index.py` entrypoint which exposes the Flask app as a WSGI app.
+
+   Required environment variables (set these in the Vercel project settings or using the Vercel CLI):
+
+   - `MONGODB_URI` — MongoDB connection string (required)
+   - `MONGODB_DB` — optional DB name (defaults to `note_app_db`)
+   - `GITHUB_TOKEN` — required only if you plan to use the LLM features from `src/llm.py`
+
+   Quick deploy steps:
+
+   1. Install and login to the Vercel CLI (optional, you can also use the Git integration):
+
+      ```bash
+      npm i -g vercel
+      vercel login
+      ```
+
+   2. From the repo root run:
+
+      ```bash
+      vercel --prod
+      ```
+
+      The CLI will guide you through creating a project and setting environment variables. Alternatively, go to the Vercel dashboard, create a new project from this Git repo, and add the environment variables under Settings -> Environment Variables.
+
+   Notes and troubleshooting:
+
+   - The Flask app expects environment variables to be present at import time. Ensure `MONGODB_URI` is set in the Vercel project environment; otherwise the app will raise on cold start.
+   - Static files are served from `src/static`. The `vercel.json` routes requests to the serverless entrypoint which serves the SPA `index.html`.
+   - If you only want to deploy the frontend as static files, you can instead point Vercel to `src/static` and deploy it as a static site. The current setup deploys the Flask API + static site together so the same domain serves both.
 - **Content Textarea**: Rich text editing area
 - **Save Button**: Manual save option (auto-save also available)
 - **Delete Button**: Remove notes with confirmation
