@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 from bson.objectid import ObjectId
 from datetime import datetime
 from src.models import note as note_model
-from src.llm import generate_note_metadata
+from src.llm import generate_note_metadata, translate_to_language
 
 note_bp = Blueprint('note', __name__)
 
@@ -116,6 +116,50 @@ def generate_note():
         created = col.find_one({'_id': res.inserted_id})
         return jsonify(note_model.to_public(created)), 201
         
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@note_bp.route('/notes/<note_id>/translate', methods=['POST'])
+def translate_note(note_id):
+    """Translate a saved note's content to a target language"""
+    try:
+        data = request.json or {}
+        target_language = data.get('target_language', 'Chinese')
+
+        col = note_model.get_notes_collection()
+        doc = col.find_one({'_id': ObjectId(note_id)})
+        if not doc:
+            return jsonify({'error': 'Not found'}), 404
+
+        content = doc.get('content', '')
+        if not content:
+            return jsonify({'error': 'Note has no content to translate'}), 400
+
+        translation = translate_to_language(content, target_language)
+        if not translation:
+            return jsonify({'error': 'Translation failed'}), 500
+
+        return jsonify({'translation': translation, 'target_language': target_language})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@note_bp.route('/notes/translate', methods=['POST'])
+def translate_text():
+    """Translate arbitrary text (useful for unsaved/new notes)"""
+    try:
+        data = request.json or {}
+        content = data.get('content')
+        target_language = data.get('target_language', 'Chinese')
+        if not content:
+            return jsonify({'error': 'Content is required'}), 400
+
+        translation = translate_to_language(content, target_language)
+        if not translation:
+            return jsonify({'error': 'Translation failed'}), 500
+
+        return jsonify({'translation': translation, 'target_language': target_language})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

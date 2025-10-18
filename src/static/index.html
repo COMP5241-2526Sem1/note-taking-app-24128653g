@@ -373,6 +373,7 @@
                     <div class="editor-actions" id="editorActions" style="display: none;">
                         <button class="btn btn-save" id="saveBtn">💾 Save</button>
                         <button class="btn btn-delete" id="deleteBtn">🗑️ Delete</button>
+                        <button class="btn" id="translateBtn" title="Translate note">🌐 Translate</button>
                     </div>
                 </div>
 
@@ -393,6 +394,10 @@
                         <label class="form-label" for="noteTags">Tags</label>
                         <input type="text" class="form-input" id="noteTags" placeholder="Enter tags (comma-separated)">
                         <button class="btn btn-generate" id="generateBtn" style="margin-top: 10px;">🎯 Generate Title & Tags</button>
+                        <div id="translationArea" style="margin-top:12px; display:none;">
+                            <label class="form-label">Translation (<span id="translationLang">Chinese</span>):</label>
+                            <div id="translationResult" style="white-space:pre-wrap; padding:10px; background:#f5f5f5; border-radius:8px; border:1px solid #e1e5e9;"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -422,6 +427,7 @@
                 document.getElementById('newNoteBtn').addEventListener('click', () => this.createNewNote());
                 document.getElementById('saveBtn').addEventListener('click', () => this.saveNote());
                 document.getElementById('deleteBtn').addEventListener('click', () => this.deleteNote());
+                document.getElementById('translateBtn').addEventListener('click', () => this.translateCurrentNote());
                 document.getElementById('searchBox').addEventListener('input', (e) => this.searchNotes(e.target.value));
                 document.getElementById('generateBtn').addEventListener('click', () => this.generateNote());
                 
@@ -559,6 +565,48 @@
                     this.showMessage('Successfully generated note!', 'success');
                 } catch (error) {
                     this.showMessage(`Error generating note: ${error.message}`, 'error');
+                }
+            }
+
+            async translateCurrentNote() {
+                if (!this.currentNote && !document.getElementById('noteContent').value.trim()) {
+                    this.showMessage('No note selected and no content to translate', 'error');
+                    return;
+                }
+
+                // Ask user for target language (simple prompt for MVP)
+                const target = prompt('Enter target language (e.g. Chinese, Spanish, French):', 'Chinese');
+                if (!target) return;
+
+                try {
+                    let response;
+                    // If the note is saved (has id) call the note-specific endpoint
+                    if (this.currentNote && this.currentNote.id) {
+                        response = await fetch(`/api/notes/${this.currentNote.id}/translate`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ target_language: target })
+                        });
+                    } else {
+                        // Translate unsaved content
+                        const content = document.getElementById('noteContent').value.trim();
+                        response = await fetch('/api/notes/translate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ content, target_language: target })
+                        });
+                    }
+
+                    if (!response.ok) throw new Error('Translation request failed');
+                    const data = await response.json();
+
+                    // Show translation area
+                    document.getElementById('translationLang').textContent = data.target_language;
+                    document.getElementById('translationResult').textContent = data.translation;
+                    document.getElementById('translationArea').style.display = 'block';
+                    this.showMessage('Translation completed', 'success');
+                } catch (error) {
+                    this.showMessage(`Error translating note: ${error.message}`, 'error');
                 }
             }
 
